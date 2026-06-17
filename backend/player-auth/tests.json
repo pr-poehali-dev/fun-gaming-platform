@@ -1,19 +1,18 @@
 {
   "tests": [
     {
-      "name": "Авторизация существующего игрока",
+      "name": "Вход без пароля — ошибка",
       "method": "POST",
       "path": "/",
-      "body": {"nickname": "Друн"},
-      "expectedStatus": 200,
-      "expectedBody": {"nickname": "Друн"},
+      "body": {"nickname": "Друн", "action": "login"},
+      "expectedStatus": 400,
       "bodyMatcher": "partial"
     },
     {
-      "name": "Отказ неизвестному нику",
+      "name": "Неизвестный ник — ошибка",
       "method": "POST",
       "path": "/",
-      "body": {"nickname": "Хакер777"},
+      "body": {"nickname": "Хакер777", "password": "test123", "action": "login"},
       "expectedStatus": 403,
       "bodyMatcher": "partial"
     }

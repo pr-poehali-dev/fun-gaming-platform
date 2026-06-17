@@ -54,6 +54,8 @@ const NAV: [View, string, string][] = [
 export default function Index() {
   const [tab, setTab] = useState<'login' | 'register'>('register');
   const [nickname, setNickname] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
@@ -80,17 +82,18 @@ export default function Index() {
 
   const handleAuth = async () => {
     const name = nickname.trim();
-    if (!name) return;
+    const pass = password.trim();
+    if (!name || !pass) return;
     setLoading(true);
     setError('');
     try {
       const res = await fetch(AUTH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: name }),
+        body: JSON.stringify({ nickname: name, password: pass, action: tab }),
       });
       const data = await res.json();
-      if (!res.ok) setError(data.error || 'Ошибка входа');
+      if (!res.ok) setError(data.error || 'Ошибка');
       else setPlayer(data);
     } catch {
       setError('Ошибка соединения. Попробуй ещё раз');
@@ -150,7 +153,7 @@ export default function Index() {
             {(['register', 'login'] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => { setTab(t); setError(''); }}
+                onClick={() => { setTab(t); setError(''); setPassword(''); }}
                 className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === t ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground'}`}
               >
                 {t === 'register' ? 'Регистрация' : 'Вход'}
@@ -164,18 +167,38 @@ export default function Index() {
               <Input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                 placeholder="Введите ваш ник"
                 className="h-11 bg-muted border-border text-sm"
                 disabled={loading}
               />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Пароль</label>
+              <div className="relative">
+                <Input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={tab === 'register' ? 'Придумайте пароль (мин. 4 символа)' : 'Введите пароль'}
+                  className="h-11 bg-muted border-border text-sm pr-11"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={16} />
+                </button>
+              </div>
             </div>
             {error && (
               <p className="text-xs text-destructive flex items-center gap-1.5 animate-float-up">
                 <Icon name="TriangleAlert" size={14} /> {error}
               </p>
             )}
-            <Button onClick={handleAuth} disabled={loading} className="w-full h-11 font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
+            <Button onClick={handleAuth} disabled={loading || !nickname.trim() || !password.trim()} className="w-full h-11 font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90 disabled:opacity-50">
               {loading
                 ? <><Icon name="Loader" size={16} className="mr-2 animate-spin" /> Загрузка...</>
                 : <>{tab === 'register' ? 'Создать аккаунт' : 'Войти'} <Icon name="ArrowRight" size={16} className="ml-1" /></>}
