@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
+import GameArena from '@/components/GameArena';
 
 const COINS_300 = 'Пузатый доллар';
 const ALLOWED_USERS = [
@@ -38,6 +39,7 @@ export default function Index() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [reward, setReward] = useState<string | null>(null);
   const [view, setView] = useState<'profile' | 'games' | 'friends'>('profile');
+  const [activeGame, setActiveGame] = useState<string | null>(null);
 
   const handleAuth = () => {
     const name = nickname.trim();
@@ -55,8 +57,7 @@ export default function Index() {
     });
   };
 
-  const playGame = (gameName: string) => {
-    const win = Math.random() > 0.5;
+  const finishGame = (win: boolean) => {
     setPlayer((p) => {
       if (!p) return p;
       if (!win) return p;
@@ -70,8 +71,10 @@ export default function Index() {
       }
       return { ...p, xp, level, coins };
     });
-    setReward(win ? `Победа в «${gameName}»! +10 ЖГ +50 опыта` : `Поражение в «${gameName}». В этот раз без награды`);
-    setTimeout(() => setReward(null), 2600);
+    if (win) {
+      setReward('Победа! +10 ЖГ монет и +50 опыта');
+      setTimeout(() => setReward(null), 2600);
+    }
   };
 
   const toggleFriend = (name: string) => {
@@ -136,6 +139,13 @@ export default function Index() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-5xl mx-auto">
+      {activeGame && (
+        <GameArena
+          game={activeGame}
+          onFinish={finishGame}
+          onClose={() => setActiveGame(null)}
+        />
+      )}
       {reward && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-pop-in">
           <div className="bg-card neon-border rounded-2xl px-6 py-3 font-semibold flex items-center gap-2">
@@ -216,7 +226,7 @@ export default function Index() {
               </div>
               <h3 className="font-display text-2xl font-bold mb-1">{g.name}</h3>
               <p className="text-sm text-muted-foreground mb-4">Победа: +10 ЖГ и +50 опыта</p>
-              <Button onClick={() => playGame(g.name)} className="w-full font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              <Button onClick={() => setActiveGame(g.name)} className="w-full font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
                 <Icon name="Play" size={16} className="mr-1" /> Играть
               </Button>
             </Card>
