@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {
+      "name": "Победа — начисление монет",
+      "method": "POST",
+      "path": "/",
+      "body": {"nickname": "Друн", "action": "win"},
+      "expectedStatus": 200,
+      "expectedBody": {"nickname": "Друн"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

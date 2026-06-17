@@ -5,15 +5,24 @@ import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import GameArena from '@/components/GameArena';
 
-const COINS_300 = 'Пузатый доллар';
-const ALLOWED_USERS = [
+const AUTH_URL = 'https://functions.poehali.dev/7f4b5993-a669-431f-b9dc-99652d01ebc7';
+const UPDATE_URL = 'https://functions.poehali.dev/a17b9c02-ead2-4f99-b2dd-04dd75b5c452';
+
+const ALL_PLAYERS = [
   'egorik1000-7', 'Великий доллар', 'Крутой доллар', 'Друн',
   'Левое волосатое яйцо Арсения', 'Маканский доллар',
   'Конгвест манго Троллфейс Миха дылда', 'Вон та залупа Егора', 'Ч',
-  COINS_300,
+  'Пузатый доллар',
 ];
 
 const XP_PER_LEVEL = 1000;
+
+const GAMES = [
+  { id: 'tag', name: 'Догонялки', icon: 'Footprints', color: 'from-pink-500 to-rose-500' },
+  { id: 'hide', name: 'Прятки', icon: 'Eye', color: 'from-cyan-400 to-teal-500' },
+  { id: 'race', name: 'Гонки', icon: 'Car', color: 'from-amber-400 to-orange-500' },
+  { id: 'quiz', name: 'Викторина', icon: 'Brain', color: 'from-violet-500 to-fuchsia-500' },
+];
 
 interface Player {
   nickname: string;
@@ -23,66 +32,77 @@ interface Player {
   friends: string[];
 }
 
-const GAMES = [
-  { id: 'tag', name: 'Догонялки', icon: 'Footprints', color: 'from-pink-500 to-rose-500' },
-  { id: 'hide', name: 'Прятки', icon: 'Eye', color: 'from-cyan-400 to-teal-500' },
-  { id: 'race', name: 'Гонки', icon: 'Car', color: 'from-amber-400 to-orange-500' },
-  { id: 'quiz', name: 'Викторина', icon: 'Brain', color: 'from-violet-500 to-fuchsia-500' },
-];
-
-const ALL_PLAYERS = [...ALLOWED_USERS];
-
 export default function Index() {
   const [tab, setTab] = useState<'login' | 'register'>('register');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [reward, setReward] = useState<string | null>(null);
   const [view, setView] = useState<'profile' | 'games' | 'friends'>('profile');
   const [activeGame, setActiveGame] = useState<string | null>(null);
 
-  const handleAuth = () => {
+  const handleAuth = async () => {
     const name = nickname.trim();
-    if (!ALLOWED_USERS.includes(name)) {
-      setError('Такой аккаунт не найден в системе ЖГ');
-      return;
-    }
+    if (!name) return;
+    setLoading(true);
     setError('');
-    setPlayer({
-      nickname: name,
-      level: 1,
-      coins: name === COINS_300 ? 200 : 100,
-      xp: 0,
-      friends: [],
-    });
+    try {
+      const res = await fetch(AUTH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Ошибка входа');
+      } else {
+        setPlayer(data);
+      }
+    } catch {
+      setError('Ошибка соединения. Попробуй ещё раз');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const finishGame = (win: boolean) => {
-    setPlayer((p) => {
-      if (!p) return p;
-      if (!win) return p;
-      let xp = p.xp + 50;
-      let level = p.level;
-      let coins = p.coins + 10;
-      while (xp >= XP_PER_LEVEL) {
-        xp -= XP_PER_LEVEL;
-        level += 1;
-        coins += 25;
-      }
-      return { ...p, xp, level, coins };
-    });
-    if (win) {
+  const callUpdate = async (action: string, extra?: Record<string, string>) => {
+    if (!player) return null;
+    try {
+      const res = await fetch(UPDATE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: player.nickname, action, ...extra }),
+      });
+      if (!res.ok) return null;
+      return await res.json() as Player;
+    } catch {
+      return null;
+    }
+  };
+
+  const finishGame = async (win: boolean) => {
+    if (!win) return;
+    const updated = await callUpdate('win');
+    if (updated) {
+      setPlayer(updated);
       setReward('Победа! +10 ЖГ монет и +50 опыта');
       setTimeout(() => setReward(null), 2600);
     }
   };
 
-  const toggleFriend = (name: string) => {
-    setPlayer((p) => {
-      if (!p) return p;
-      const has = p.friends.includes(name);
-      return { ...p, friends: has ? p.friends.filter((f) => f !== name) : [...p.friends, name] };
-    });
+  const toggleFriend = async (name: string) => {
+    if (!player) return;
+    const isFriend = player.friends.includes(name);
+    const updated = await callUpdate(isFriend ? 'friend_remove' : 'friend_add', { friend: name });
+    if (updated) setPlayer(updated);
+    else {
+      // Оптимистичное обновление если бэкенд недоступен
+      setPlayer((p) => p ? {
+        ...p,
+        friends: isFriend ? p.friends.filter((f) => f !== name) : [...p.friends, name]
+      } : p);
+    }
   };
 
   if (!player) {
@@ -118,6 +138,7 @@ export default function Index() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                 placeholder="Введите ваш ник"
                 className="h-12 bg-muted border-border text-base"
+                disabled={loading}
               />
             </div>
             {error && (
@@ -125,9 +146,11 @@ export default function Index() {
                 <Icon name="TriangleAlert" size={16} /> {error}
               </p>
             )}
-            <Button onClick={handleAuth} className="w-full h-12 text-base font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
-              {tab === 'register' ? 'Создать аккаунт' : 'Войти'}
-              <Icon name="ArrowRight" size={18} className="ml-1" />
+            <Button onClick={handleAuth} disabled={loading} className="w-full h-12 text-base font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              {loading
+                ? <><Icon name="Loader" size={18} className="mr-2 animate-spin" /> Загрузка...</>
+                : <>{tab === 'register' ? 'Создать аккаунт' : 'Войти'} <Icon name="ArrowRight" size={18} className="ml-1" /></>
+              }
             </Button>
           </div>
         </Card>

@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Авторизация существующего игрока",
+      "method": "POST",
+      "path": "/",
+      "body": {"nickname": "Друн"},
+      "expectedStatus": 200,
+      "expectedBody": {"nickname": "Друн"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Отказ неизвестному нику",
+      "method": "POST",
+      "path": "/",
+      "body": {"nickname": "Хакер777"},
+      "expectedStatus": 403,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
