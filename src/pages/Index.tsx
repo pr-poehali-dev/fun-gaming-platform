@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import GameArena from '@/components/GameArena';
 
 const AUTH_URL = 'https://functions.poehali.dev/7f4b5993-a669-431f-b9dc-99652d01ebc7';
 const UPDATE_URL = 'https://functions.poehali.dev/a17b9c02-ead2-4f99-b2dd-04dd75b5c452';
+const LEADERBOARD_URL = 'https://functions.poehali.dev/23528d07-5bb3-4b03-bf11-e8103c712d8d';
 
 const ALL_PLAYERS = [
   'egorik1000-7', 'Великий доллар', 'Крутой доллар', 'Друн',
@@ -32,6 +33,24 @@ interface Player {
   friends: string[];
 }
 
+interface Leader {
+  nickname: string;
+  coins: number;
+  level: number;
+  xp: number;
+}
+
+type View = 'profile' | 'games' | 'friends' | 'rating';
+
+const MEDAL = ['🥇', '🥈', '🥉'];
+
+const NAV: [View, string, string][] = [
+  ['profile', 'Профиль', 'User'],
+  ['games', 'Игры', 'Gamepad2'],
+  ['friends', 'Друзья', 'Users'],
+  ['rating', 'Рейтинг', 'Trophy'],
+];
+
 export default function Index() {
   const [tab, setTab] = useState<'login' | 'register'>('register');
   const [nickname, setNickname] = useState('');
@@ -39,8 +58,25 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [reward, setReward] = useState<string | null>(null);
-  const [view, setView] = useState<'profile' | 'games' | 'friends'>('profile');
+  const [view, setView] = useState<View>('profile');
   const [activeGame, setActiveGame] = useState<string | null>(null);
+  const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [loadingLeaders, setLoadingLeaders] = useState(false);
+
+  const fetchLeaders = async () => {
+    setLoadingLeaders(true);
+    try {
+      const res = await fetch(LEADERBOARD_URL);
+      const data = await res.json();
+      setLeaders(data);
+    } catch { /* тихо */ } finally {
+      setLoadingLeaders(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'rating') fetchLeaders();
+  }, [view]);
 
   const handleAuth = async () => {
     const name = nickname.trim();
@@ -54,11 +90,8 @@ export default function Index() {
         body: JSON.stringify({ nickname: name }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Ошибка входа');
-      } else {
-        setPlayer(data);
-      }
+      if (!res.ok) setError(data.error || 'Ошибка входа');
+      else setPlayer(data);
     } catch {
       setError('Ошибка соединения. Попробуй ещё раз');
     } finally {
@@ -76,9 +109,7 @@ export default function Index() {
       });
       if (!res.ok) return null;
       return await res.json() as Player;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   };
 
   const finishGame = async (win: boolean) => {
@@ -96,61 +127,58 @@ export default function Index() {
     const isFriend = player.friends.includes(name);
     const updated = await callUpdate(isFriend ? 'friend_remove' : 'friend_add', { friend: name });
     if (updated) setPlayer(updated);
-    else {
-      // Оптимистичное обновление если бэкенд недоступен
-      setPlayer((p) => p ? {
-        ...p,
-        friends: isFriend ? p.friends.filter((f) => f !== name) : [...p.friends, name]
-      } : p);
-    }
+    else setPlayer((p) => p ? {
+      ...p,
+      friends: isFriend ? p.friends.filter((f) => f !== name) : [...p.friends, name],
+    } : p);
   };
 
+  /* ── Экран авторизации ── */
   if (!player) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 neon-border animate-pop-in bg-card/80 backdrop-blur-xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent mb-4 animate-coin">
-              <span className="font-display text-4xl font-bold text-white">ЖГ</span>
+        <Card className="w-full max-w-sm p-6 sm:p-8 neon-border animate-pop-in bg-card/80 backdrop-blur-xl">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-primary to-accent mb-3 animate-coin">
+              <span className="font-display text-3xl sm:text-4xl font-bold text-white">ЖГ</span>
             </div>
-            <h1 className="font-display text-4xl font-bold tracking-wide text-glow">ЖГ ПЛАТФОРМА</h1>
-            <p className="text-muted-foreground mt-2">Играй. Прокачивайся. Доминируй.</p>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-wide text-glow">ЖГ ПЛАТФОРМА</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Играй. Прокачивайся. Доминируй.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-6 p-1 bg-muted rounded-2xl">
+          <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-muted rounded-2xl">
             {(['register', 'login'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => { setTab(t); setError(''); }}
-                className={`py-2.5 rounded-xl font-semibold transition-all ${tab === t ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground'}`}
+                className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === t ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground'}`}
               >
                 {t === 'register' ? 'Регистрация' : 'Вход'}
               </button>
             ))}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Никнейм</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Никнейм</label>
               <Input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                 placeholder="Введите ваш ник"
-                className="h-12 bg-muted border-border text-base"
+                className="h-11 bg-muted border-border text-sm"
                 disabled={loading}
               />
             </div>
             {error && (
-              <p className="text-sm text-destructive flex items-center gap-2 animate-float-up">
-                <Icon name="TriangleAlert" size={16} /> {error}
+              <p className="text-xs text-destructive flex items-center gap-1.5 animate-float-up">
+                <Icon name="TriangleAlert" size={14} /> {error}
               </p>
             )}
-            <Button onClick={handleAuth} disabled={loading} className="w-full h-12 text-base font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
+            <Button onClick={handleAuth} disabled={loading} className="w-full h-11 font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
               {loading
-                ? <><Icon name="Loader" size={18} className="mr-2 animate-spin" /> Загрузка...</>
-                : <>{tab === 'register' ? 'Создать аккаунт' : 'Войти'} <Icon name="ArrowRight" size={18} className="ml-1" /></>
-              }
+                ? <><Icon name="Loader" size={16} className="mr-2 animate-spin" /> Загрузка...</>
+                : <>{tab === 'register' ? 'Создать аккаунт' : 'Войти'} <Icon name="ArrowRight" size={16} className="ml-1" /></>}
             </Button>
           </div>
         </Card>
@@ -161,125 +189,208 @@ export default function Index() {
   const xpPercent = (player.xp / XP_PER_LEVEL) * 100;
 
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-5xl mx-auto">
+    <div className="min-h-screen flex flex-col">
       {activeGame && (
-        <GameArena
-          game={activeGame}
-          onFinish={finishGame}
-          onClose={() => setActiveGame(null)}
-        />
+        <GameArena game={activeGame} onFinish={finishGame} onClose={() => setActiveGame(null)} />
       )}
+
       {reward && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-pop-in">
-          <div className="bg-card neon-border rounded-2xl px-6 py-3 font-semibold flex items-center gap-2">
-            <Icon name="Sparkles" size={18} className="text-secondary" /> {reward}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-pop-in w-max max-w-[90vw]">
+          <div className="bg-card neon-border rounded-2xl px-4 py-2.5 font-semibold flex items-center gap-2 text-sm">
+            <Icon name="Sparkles" size={16} className="text-secondary shrink-0" /> {reward}
           </div>
         </div>
       )}
 
-      <header className="flex items-center justify-between mb-8 animate-float-up">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center font-display font-bold text-white">ЖГ</div>
-          <span className="font-display text-2xl font-bold tracking-wide">ПЛАТФОРМА</span>
+      {/* Шапка */}
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center font-display font-bold text-white text-sm">ЖГ</div>
+          <span className="font-display text-base font-bold tracking-wide hidden sm:block">ПЛАТФОРМА</span>
         </div>
-        <Button variant="ghost" onClick={() => setPlayer(null)} className="text-muted-foreground">
-          <Icon name="LogOut" size={18} className="mr-1" /> Выйти
-        </Button>
+
+        {/* Десктопная навигация */}
+        <nav className="hidden sm:flex items-center gap-1 p-1 bg-card/60 rounded-2xl flex-1 justify-center max-w-md">
+          {NAV.map(([v, label, icon]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all flex-1 justify-center ${view === v ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Icon name={icon} size={15} /> {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 px-2.5 py-1.5 bg-card rounded-xl border border-border">
+            <Icon name="Coins" size={13} className="text-accent" />
+            <span className="font-bold text-sm">{player.coins}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setPlayer(null)} className="text-muted-foreground w-8 h-8">
+            <Icon name="LogOut" size={15} />
+          </Button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-3 gap-2 mb-8 p-1.5 bg-card/60 backdrop-blur rounded-2xl">
-        {([['profile', 'Профиль', 'User'], ['games', 'Игры', 'Gamepad2'], ['friends', 'Друзья', 'Users']] as const).map(([v, label, icon]) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${view === v ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <Icon name={icon} size={18} /> <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Основной контент */}
+      <main className="flex-1 p-4 sm:p-6 max-w-2xl mx-auto w-full pb-24 sm:pb-8">
 
-      {view === 'profile' && (
-        <div className="space-y-6 animate-float-up">
-          <Card className="p-8 neon-border bg-card/80 backdrop-blur-xl">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-primary via-accent to-secondary flex items-center justify-center text-5xl font-display font-bold text-white shrink-0">
-                {player.nickname[0].toUpperCase()}
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h2 className="font-display text-3xl font-bold text-glow">{player.nickname}</h2>
-                <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-sm font-bold">
-                  <Icon name="Star" size={14} /> Игрок ЖГ
-                </span>
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Опыт</span>
-                    <span className="font-semibold">{player.xp} / {XP_PER_LEVEL}</span>
-                  </div>
-                  <div className="h-3 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500" style={{ width: `${xpPercent}%` }} />
+        {/* ─── Профиль ─── */}
+        {view === 'profile' && (
+          <div className="space-y-4 animate-float-up">
+            <Card className="p-4 sm:p-6 neon-border bg-card/80 backdrop-blur-xl">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary via-accent to-secondary flex items-center justify-center font-display font-bold text-white text-2xl sm:text-3xl shrink-0">
+                  {player.nickname[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-display text-lg sm:text-2xl font-bold text-glow truncate">{player.nickname}</h2>
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-bold">
+                    <Icon name="Star" size={11} /> Игрок ЖГ
+                  </span>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Опыт до ур. {player.level + 1}</span>
+                      <span className="font-semibold">{player.xp} / {XP_PER_LEVEL}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500" style={{ width: `${xpPercent}%` }} />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Уровень', value: player.level, icon: 'Trophy', color: 'text-secondary' },
-              { label: 'ЖГ Монеты', value: player.coins, icon: 'Coins', color: 'text-accent' },
-              { label: 'Друзья', value: player.friends.length, icon: 'Heart', color: 'text-primary' },
-            ].map((s) => (
-              <Card key={s.label} className="p-5 text-center bg-card/80 backdrop-blur hover-scale">
-                <Icon name={s.icon} size={28} className={`mx-auto mb-2 ${s.color}`} />
-                <div className="font-display text-3xl font-bold">{s.value}</div>
-                <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Уровень', value: player.level, icon: 'Trophy', color: 'text-secondary' },
+                { label: 'ЖГ Монеты', value: player.coins, icon: 'Coins', color: 'text-accent' },
+                { label: 'Друзья', value: player.friends.length, icon: 'Heart', color: 'text-primary' },
+              ].map((s) => (
+                <Card key={s.label} className="p-3 sm:p-5 text-center bg-card/80 backdrop-blur hover-scale">
+                  <Icon name={s.icon} size={20} className={`mx-auto mb-1.5 ${s.color}`} />
+                  <div className="font-display text-2xl sm:text-3xl font-bold">{s.value}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Игры ─── */}
+        {view === 'games' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-float-up">
+            {GAMES.map((g) => (
+              <Card key={g.id} className="p-4 bg-card/80 backdrop-blur hover-scale flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 sm:mb-4 rounded-2xl bg-gradient-to-br ${g.color} flex items-center justify-center shrink-0`}>
+                  <Icon name={g.icon} size={22} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-display text-lg sm:text-xl font-bold">{g.name}</h3>
+                  <p className="text-xs text-muted-foreground">Победа: +10 ЖГ и +50 опыта</p>
+                </div>
+                <Button onClick={() => setActiveGame(g.name)} size="sm" className="shrink-0 font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
+                  <Icon name="Play" size={13} className="mr-1" /> Играть
+                </Button>
               </Card>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {view === 'games' && (
-        <div className="grid sm:grid-cols-2 gap-4 animate-float-up">
-          {GAMES.map((g) => (
-            <Card key={g.id} className="p-6 bg-card/80 backdrop-blur hover-scale">
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${g.color} flex items-center justify-center mb-4`}>
-                <Icon name={g.icon} size={28} className="text-white" />
-              </div>
-              <h3 className="font-display text-2xl font-bold mb-1">{g.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">Победа: +10 ЖГ и +50 опыта</p>
-              <Button onClick={() => setActiveGame(g.name)} className="w-full font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90">
-                <Icon name="Play" size={16} className="mr-1" /> Играть
+        {/* ─── Друзья ─── */}
+        {view === 'friends' && (
+          <div className="space-y-2 animate-float-up">
+            {ALL_PLAYERS.filter((n) => n !== player.nickname).map((name) => {
+              const isFriend = player.friends.includes(name);
+              return (
+                <Card key={name} className="p-3 sm:p-4 bg-card/80 backdrop-blur flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
+                    {name[0].toUpperCase()}
+                  </div>
+                  <span className="flex-1 font-semibold text-sm truncate">{name}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => toggleFriend(name)}
+                    variant={isFriend ? 'secondary' : 'default'}
+                    className={`shrink-0 text-xs ${isFriend ? '' : 'bg-gradient-to-r from-primary to-accent hover:opacity-90'}`}
+                  >
+                    <Icon name={isFriend ? 'Check' : 'UserPlus'} size={12} className="mr-1" />
+                    {isFriend ? 'В друзьях' : 'Добавить'}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ─── Рейтинг ─── */}
+        {view === 'rating' && (
+          <div className="animate-float-up space-y-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display text-xl font-bold">Таблица лидеров</h2>
+              <Button variant="ghost" size="sm" onClick={fetchLeaders} disabled={loadingLeaders} className="text-muted-foreground text-xs">
+                <Icon name="RefreshCw" size={13} className={`mr-1 ${loadingLeaders ? 'animate-spin' : ''}`} /> Обновить
               </Button>
-            </Card>
+            </div>
+
+            {loadingLeaders && leaders.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Icon name="Loader" size={30} className="mx-auto animate-spin mb-3" />
+                <p className="text-sm">Загружаем рейтинг...</p>
+              </div>
+            )}
+
+            {!loadingLeaders && leaders.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Icon name="Trophy" size={36} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Пока нет игроков в рейтинге.<br />Войди и сыграй первым!</p>
+              </div>
+            )}
+
+            {leaders.map((l, i) => {
+              const isMe = l.nickname === player.nickname;
+              return (
+                <Card
+                  key={l.nickname}
+                  className={`p-3 sm:p-4 backdrop-blur flex items-center gap-3 transition-all ${isMe ? 'neon-border bg-primary/10' : 'bg-card/80'}`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0 ${i < 3 ? 'bg-gradient-to-br from-primary to-accent text-white' : 'bg-muted text-muted-foreground'}`}>
+                    {i < 3 ? MEDAL[i] : i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold text-sm truncate ${isMe ? 'text-primary' : ''}`}>
+                      {l.nickname} {isMe && <span className="text-xs text-muted-foreground font-normal">(ты)</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Уровень {l.level} · {l.xp} опыта</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Icon name="Coins" size={13} className="text-accent" />
+                    <span className="font-display font-bold text-lg">{l.coins}</span>
+                    <span className="text-xs text-muted-foreground">ЖГ</span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </main>
+
+      {/* Нижняя навигация — только мобиль */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border">
+        <div className="grid grid-cols-4 gap-0 py-1 px-2 pb-2">
+          {NAV.map(([v, label, icon]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl transition-all ${view === v ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              <Icon name={icon} size={21} />
+              <span className="text-[10px] font-semibold leading-none">{label}</span>
+            </button>
           ))}
         </div>
-      )}
-
-      {view === 'friends' && (
-        <div className="space-y-3 animate-float-up">
-          {ALL_PLAYERS.filter((n) => n !== player.nickname).map((name) => {
-            const isFriend = player.friends.includes(name);
-            return (
-              <Card key={name} className="p-4 bg-card/80 backdrop-blur flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-display font-bold text-white shrink-0">
-                  {name[0].toUpperCase()}
-                </div>
-                <span className="flex-1 font-semibold truncate">{name}</span>
-                <Button
-                  onClick={() => toggleFriend(name)}
-                  variant={isFriend ? 'secondary' : 'default'}
-                  className={isFriend ? '' : 'bg-gradient-to-r from-primary to-accent hover:opacity-90'}
-                >
-                  <Icon name={isFriend ? 'Check' : 'UserPlus'} size={16} className="mr-1" />
-                  {isFriend ? 'В друзьях' : 'Добавить'}
-                </Button>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      </nav>
     </div>
   );
 }

@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "Получение таблицы лидеров",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
