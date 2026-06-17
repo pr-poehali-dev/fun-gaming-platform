@@ -4,35 +4,35 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 258 70% 8%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 258 50% 14%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 258 50% 14%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 320 90% 58%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 48 100% 55%;
+    --secondary-foreground: 258 70% 8%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 258 40% 20%;
+    --muted-foreground: 258 20% 70%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 175 85% 50%;
+    --accent-foreground: 258 70% 8%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 258 40% 28%;
+    --input: 258 40% 28%;
+    --ring: 320 90% 58%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -97,5 +97,85 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Rubik", sans-serif;
+    background-image:
+      radial-gradient(
+        circle at 15% 20%,
+        hsl(320 90% 30% / 0.4) 0%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 85% 30%,
+        hsl(175 85% 30% / 0.35) 0%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 50% 90%,
+        hsl(48 100% 35% / 0.25) 0%,
+        transparent 45%
+      );
+    background-attachment: fixed;
   }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Oswald", sans-serif;
+  }
+  .text-glow {
+    text-shadow: 0 0 20px hsl(320 90% 58% / 0.6);
+  }
+  .neon-border {
+    box-shadow:
+      0 0 0 1px hsl(320 90% 58% / 0.3),
+      0 0 30px hsl(320 90% 58% / 0.25);
+  }
+  .hover-scale {
+    transition: transform 0.2s ease;
+  }
+  .hover-scale:hover {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes coin-spin {
+  0%,
+  100% {
+    transform: rotateY(0deg);
+  }
+  50% {
+    transform: rotateY(180deg);
+  }
+}
+.animate-float-up {
+  animation: float-up 0.5s ease both;
+}
+.animate-pop-in {
+  animation: pop-in 0.4s ease both;
+}
+.animate-coin {
+  animation: coin-spin 2.5s ease-in-out infinite;
 }
