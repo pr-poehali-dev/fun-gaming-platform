@@ -127,13 +127,8 @@ export default function Index() {
     setCaseOpening(true);
     setCaseResult(null);
 
-    // Генерируем рандомную ленту из 40 элементов для прокрутки
-    const pool = [...CASE_PRIZES, ...CASE_PRIZES, ...CASE_PRIZES];
-    const strip = Array.from({ length: 40 }, () => pool[Math.floor(Math.random() * pool.length)]);
-    setSpinItems(strip);
-    setCaseResult({ prize: 0, spinning: true });
-
     try {
+      // Сначала получаем реальный приз с сервера
       const res = await fetch(CASE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,16 +138,30 @@ export default function Index() {
       if (!res.ok) {
         setReward(data.error || 'Ошибка открытия кейса');
         setTimeout(() => setReward(null), 3000);
-        setCaseResult(null);
         setCaseOpening(false);
         return;
       }
-      // Ждём анимацию (~2.5с) затем показываем результат
+
+      const prize: number = data.prize;
+      const prizeItem = CASE_PRIZES.find(p => p.amount === prize) ?? CASE_PRIZES[0];
+
+      // Строим ленту: 38 случайных + реальный приз на позиции 35 (будет по центру)
+      const STOP_INDEX = 35;
+      const strip = Array.from({ length: 40 }, (_, i) => {
+        if (i === STOP_INDEX) return prizeItem;
+        return CASE_PRIZES[Math.floor(Math.random() * CASE_PRIZES.length)];
+      });
+      setSpinItems(strip);
+
+      // Запускаем анимацию
+      setCaseResult({ prize: 0, spinning: true });
+
+      // Показываем результат после завершения анимации
       setTimeout(() => {
-        setCaseResult({ prize: data.prize, spinning: false });
+        setCaseResult({ prize, spinning: false });
         setPlayer(data.player);
         setCaseOpening(false);
-      }, 2700);
+      }, 3200);
     } catch {
       setCaseResult(null);
       setCaseOpening(false);
@@ -442,18 +451,12 @@ export default function Index() {
                 <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-3 h-3 bg-primary rotate-45 z-10" />
                 <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 bg-primary rotate-45 z-10" />
 
-                {caseResult?.spinning || (!caseResult && !caseOpening) ? (
+                {caseResult?.spinning && (
                   <div
-                    className="flex items-center gap-2 absolute"
-                    style={{
-                      animation: caseResult?.spinning
-                        ? 'caseRoll 2.7s cubic-bezier(0.17,0.67,0.12,1.0) forwards'
-                        : 'none',
-                      left: caseResult?.spinning ? '0' : '50%',
-                      transform: caseResult?.spinning ? 'translateX(0)' : 'translateX(-50%)',
-                    }}
+                    className="flex items-center gap-2 absolute left-0 top-1/2 -translate-y-1/2"
+                    style={{ animation: 'caseRoll 3.0s cubic-bezier(0.12,0.8,0.25,1.0) forwards' }}
                   >
-                    {(caseResult?.spinning ? spinItems : CASE_PRIZES).map((p, i) => (
+                    {spinItems.map((p, i) => (
                       <div
                         key={i}
                         className={`shrink-0 w-20 h-16 rounded-xl bg-gradient-to-br ${TIER_COLORS[p.tier]} flex flex-col items-center justify-center`}
@@ -463,7 +466,18 @@ export default function Index() {
                       </div>
                     ))}
                   </div>
-                ) : null}
+                )}
+
+                {!caseResult && !caseOpening && (
+                  <div className="absolute inset-0 flex items-center justify-center gap-2">
+                    {CASE_PRIZES.slice(0, 5).map((p, i) => (
+                      <div key={i} className={`shrink-0 w-20 h-16 rounded-xl bg-gradient-to-br ${TIER_COLORS[p.tier]} flex flex-col items-center justify-center opacity-60`}>
+                        <Icon name="Coins" size={16} className="text-white/80 mb-0.5" />
+                        <span className="font-display font-bold text-white text-sm">{p.amount}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Результат */}
                 {caseResult && !caseResult.spinning && (

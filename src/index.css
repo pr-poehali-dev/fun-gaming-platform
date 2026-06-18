@@ -185,7 +185,7 @@
     transform: translateX(0);
   }
   100% {
-    /* 40 элементов по 88px (80+8gap) = 3520px, останавливаемся у центра */
-    transform: translateX(calc(-3520px + 50vw - 44px));
+    /* Позиция 35 * 88px = 3080px, центрируем элемент (44px = половина элемента) */
+    transform: translateX(calc(-3080px + 50% - 44px));
   }
 }
