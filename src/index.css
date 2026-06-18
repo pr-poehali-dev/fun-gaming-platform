@@ -179,3 +179,13 @@
 .animate-coin {
   animation: coin-spin 2.5s ease-in-out infinite;
 }
+
+@keyframes caseRoll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    /* 40 элементов по 88px (80+8gap) = 3520px, останавливаемся у центра */
+    transform: translateX(calc(-3520px + 50vw - 44px));
+  }
+}

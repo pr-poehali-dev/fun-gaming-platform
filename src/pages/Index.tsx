@@ -8,6 +8,7 @@ import GameArena from '@/components/GameArena';
 const AUTH_URL = 'https://functions.poehali.dev/7f4b5993-a669-431f-b9dc-99652d01ebc7';
 const UPDATE_URL = 'https://functions.poehali.dev/a17b9c02-ead2-4f99-b2dd-04dd75b5c452';
 const LEADERBOARD_URL = 'https://functions.poehali.dev/23528d07-5bb3-4b03-bf11-e8103c712d8d';
+const CASE_URL = 'https://functions.poehali.dev/9901fa99-2638-403c-a77f-ab3211c97097';
 
 const ALL_PLAYERS = [
   'egorik1000-7', 'Великий доллар', 'Крутой доллар', 'Друн',
@@ -40,13 +41,51 @@ interface Leader {
   xp: number;
 }
 
-type View = 'profile' | 'games' | 'friends' | 'rating';
+type View = 'profile' | 'games' | 'friends' | 'rating' | 'cases';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
+
+// Все возможные призы с весами (те же что на бэке, для отображения)
+const CASE_PRIZES = [
+  { amount: 10,   weight: 3000, tier: 0 },
+  { amount: 20,   weight: 2500, tier: 0 },
+  { amount: 30,   weight: 2000, tier: 0 },
+  { amount: 40,   weight: 1500, tier: 0 },
+  { amount: 50,   weight: 1200, tier: 1 },
+  { amount: 60,   weight: 1000, tier: 1 },
+  { amount: 70,   weight:  800, tier: 1 },
+  { amount: 80,   weight:  600, tier: 1 },
+  { amount: 90,   weight:  500, tier: 1 },
+  { amount: 100,  weight:  400, tier: 1 },
+  { amount: 200,  weight:  200, tier: 2 },
+  { amount: 300,  weight:  100, tier: 2 },
+  { amount: 400,  weight:   60, tier: 2 },
+  { amount: 500,  weight:   40, tier: 2 },
+  { amount: 600,  weight:   25, tier: 3 },
+  { amount: 700,  weight:   18, tier: 3 },
+  { amount: 800,  weight:   12, tier: 3 },
+  { amount: 900,  weight:    8, tier: 3 },
+  { amount: 1000, weight:    6, tier: 3 },
+  { amount: 2000, weight:    3, tier: 4 },
+  { amount: 3000, weight:    2, tier: 4 },
+  { amount: 4000, weight:    1, tier: 4 },
+  { amount: 5000, weight:    1, tier: 4 },
+];
+
+const TIER_COLORS = [
+  'from-slate-400 to-slate-500',     // 0 — обычный
+  'from-blue-400 to-cyan-500',       // 1 — редкий
+  'from-violet-500 to-fuchsia-500',  // 2 — эпический
+  'from-amber-400 to-orange-500',    // 3 — легендарный
+  'from-rose-500 to-pink-400',       // 4 — мифический
+];
+
+const TIER_LABELS = ['Обычный', 'Редкий', 'Эпический', 'Легендарный', 'Мифический'];
 
 const NAV: [View, string, string][] = [
   ['profile', 'Профиль', 'User'],
   ['games', 'Игры', 'Gamepad2'],
+  ['cases', 'Кейсы', 'Package'],
   ['friends', 'Друзья', 'Users'],
   ['rating', 'Рейтинг', 'Trophy'],
 ];
@@ -64,6 +103,9 @@ export default function Index() {
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(false);
+  const [caseOpening, setCaseOpening] = useState(false);
+  const [caseResult, setCaseResult] = useState<{prize: number; spinning: boolean} | null>(null);
+  const [spinItems, setSpinItems] = useState<typeof CASE_PRIZES>([]);
 
   const fetchLeaders = async () => {
     setLoadingLeaders(true);
@@ -79,6 +121,43 @@ export default function Index() {
   useEffect(() => {
     if (view === 'rating') fetchLeaders();
   }, [view]);
+
+  const openCase = async () => {
+    if (!player || caseOpening) return;
+    setCaseOpening(true);
+    setCaseResult(null);
+
+    // Генерируем рандомную ленту из 40 элементов для прокрутки
+    const pool = [...CASE_PRIZES, ...CASE_PRIZES, ...CASE_PRIZES];
+    const strip = Array.from({ length: 40 }, () => pool[Math.floor(Math.random() * pool.length)]);
+    setSpinItems(strip);
+    setCaseResult({ prize: 0, spinning: true });
+
+    try {
+      const res = await fetch(CASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: player.nickname }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReward(data.error || 'Ошибка открытия кейса');
+        setTimeout(() => setReward(null), 3000);
+        setCaseResult(null);
+        setCaseOpening(false);
+        return;
+      }
+      // Ждём анимацию (~2.5с) затем показываем результат
+      setTimeout(() => {
+        setCaseResult({ prize: data.prize, spinning: false });
+        setPlayer(data.player);
+        setCaseOpening(false);
+      }, 2700);
+    } catch {
+      setCaseResult(null);
+      setCaseOpening(false);
+    }
+  };
 
   const handleAuth = async () => {
     const name = nickname.trim();
@@ -344,6 +423,109 @@ export default function Index() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* ─── Кейсы ─── */}
+        {view === 'cases' && (
+          <div className="animate-float-up space-y-5">
+            <div className="text-center">
+              <h2 className="font-display text-2xl font-bold mb-1">ЖГ Кейс</h2>
+              <p className="text-sm text-muted-foreground">Стоимость: <span className="text-accent font-bold">100 ЖГ монет</span></p>
+            </div>
+
+            {/* Барабан */}
+            <Card className="p-4 bg-card/80 backdrop-blur neon-border overflow-hidden">
+              <div className="relative h-20 overflow-hidden">
+                {/* Центральный маркер */}
+                <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-0.5 bg-primary z-10 pointer-events-none" />
+                <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-3 h-3 bg-primary rotate-45 z-10" />
+                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 bg-primary rotate-45 z-10" />
+
+                {caseResult?.spinning || (!caseResult && !caseOpening) ? (
+                  <div
+                    className="flex items-center gap-2 absolute"
+                    style={{
+                      animation: caseResult?.spinning
+                        ? 'caseRoll 2.7s cubic-bezier(0.17,0.67,0.12,1.0) forwards'
+                        : 'none',
+                      left: caseResult?.spinning ? '0' : '50%',
+                      transform: caseResult?.spinning ? 'translateX(0)' : 'translateX(-50%)',
+                    }}
+                  >
+                    {(caseResult?.spinning ? spinItems : CASE_PRIZES).map((p, i) => (
+                      <div
+                        key={i}
+                        className={`shrink-0 w-20 h-16 rounded-xl bg-gradient-to-br ${TIER_COLORS[p.tier]} flex flex-col items-center justify-center`}
+                      >
+                        <Icon name="Coins" size={16} className="text-white/80 mb-0.5" />
+                        <span className="font-display font-bold text-white text-sm">{p.amount}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* Результат */}
+                {caseResult && !caseResult.spinning && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center animate-pop-in">
+                    {(() => {
+                      const won = CASE_PRIZES.find(p => p.amount === caseResult.prize) ?? CASE_PRIZES[0];
+                      return (
+                        <div className={`w-full h-full rounded-xl bg-gradient-to-br ${TIER_COLORS[won.tier]} flex flex-col items-center justify-center gap-1`}>
+                          <Icon name="Coins" size={20} className="text-white/80" />
+                          <span className="font-display font-bold text-white text-2xl">{caseResult.prize} ЖГ</span>
+                          <span className="text-white/70 text-xs">{TIER_LABELS[won.tier]}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Кнопка открыть */}
+            <Button
+              onClick={openCase}
+              disabled={caseOpening || player.coins < 100}
+              className="w-full h-12 font-bold text-base bg-gradient-to-r from-primary to-accent hover:opacity-90 disabled:opacity-50"
+            >
+              {caseOpening
+                ? <><Icon name="Loader" size={16} className="mr-2 animate-spin" /> Открываем...</>
+                : player.coins < 100
+                  ? <><Icon name="Lock" size={16} className="mr-2" /> Нужно 100 монет</>
+                  : <><Icon name="Package" size={16} className="mr-2" /> Открыть кейс за 100 ЖГ</>}
+            </Button>
+
+            {caseResult && !caseResult.spinning && (
+              <div className="text-center">
+                <p className="text-muted-foreground text-sm">
+                  {caseResult.prize >= 1000 ? '🔥 НЕВЕРОЯТНО!' : caseResult.prize >= 300 ? '⚡ Отличный выигрыш!' : caseResult.prize >= 100 ? '👍 Неплохо!' : 'Повезёт в следующий раз!'}
+                </p>
+                <Button variant="ghost" size="sm" onClick={() => setCaseResult(null)} className="mt-1 text-xs text-muted-foreground">
+                  Закрыть
+                </Button>
+              </div>
+            )}
+
+            {/* Таблица призов */}
+            <div>
+              <h3 className="font-semibold text-sm text-muted-foreground mb-2">Возможные призы</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {CASE_PRIZES.map((p) => {
+                  const totalWeight = CASE_PRIZES.reduce((s, x) => s + x.weight, 0);
+                  const pct = ((p.weight / totalWeight) * 100).toFixed(1);
+                  return (
+                    <div key={p.amount} className={`rounded-xl p-2.5 bg-gradient-to-br ${TIER_COLORS[p.tier]} flex items-center gap-2`}>
+                      <Icon name="Coins" size={14} className="text-white/80 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-display font-bold text-white text-sm">{p.amount} ЖГ</p>
+                        <p className="text-white/60 text-[10px]">{pct}%</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
